@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seethawaka Regency Sales Inquiry Tracker</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: url('your-background-image.jpg') no-repeat center center fixed;
+            background-size: cover;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            max-width: 500px;
+            margin: auto;
+            padding: 30px;
+        }
+        h2, h3 {
+            text-align: center;
+            color: #2c3e50;
+        }
+        input, button {
+            width: 100%;
+            padding: 12px;
+            margin: 8px 0;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #4a90e2;
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background-color: #357abd;
+        }
+        label {
+            display: block;
+            margin-top: 10px;
+            color: #34495e;
+        }
+        #admin-panel button {
+            margin-bottom: 10px;
+        }
+        .logo {
+            display: block;
+            margin: 0 auto 20px;
+            max-width: 200px;
+        }
+        #login-container {
+            max-width: 400px;
+            margin: 100px auto;
+            text-align: center;
+        }
+        .inquiry-form {
+            display: flex;
+            flex-direction: column;
+        }
+        .inquiry-form input[type="number"] {
+            width: 48%;
+            margin-right: 4%;
+            margin-bottom: 10px;
+        }
+        .inquiry-form input[type="date"] {
+            width: 100%;
+            margin-bottom: 10px;
+        }
+        @media (max-width: 600px) {
+            body { padding: 10px; }
+            .container { padding: 20px; }
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+</head>
+<body>
+    <div class="container" id="login-container">
+        <img src="your-logo.png" alt="Logo" class="logo">
+        <h2>Seethawaka Regency Sales Inquiry Tracker</h2>
+        <input type="text" id="username" placeholder="Enter your username">
+        <input type="password" id="password" placeholder="Enter your password">
+        <button onclick="login()">Login</button>
+    </div>
+
+    <div class="container" id="dashboard" style="display:none;">
+        <h2 id="welcome"></h2>
+        <button onclick="logout()">Logout</button>
+
+        <div id="inquiry-form">
+            <h3>Submit Inquiry</h3>
+            <div class="inquiry-form">
+                <input type="date" id="entryDate" value="">
+                <label>Weddings: <input type="number" id="weddings"></label>
+                <label>Day Outs: <input type="number" id="dayOuts"></label>
+                <label>Rooms: <input type="number" id="rooms"></label>
+                <label>Honeymoon Packages: <input type="number" id="honeymoon"></label>
+                <label>High Tea: <input type="number" id="highTea"></label>
+                <label>Buffets: <input type="number" id="buffets"></label>
+                <label>Hot Orders: <input type="number" id="hotOrders"></label>
+                <label>Delivery / Takeaway Orders: <input type="number" id="deliveryOrders"></label>
+                <button onclick="submitInquiry()">Submit Inquiry</button>
+            </div>
+        </div>
+
+        <div id="admin-panel" style="display:none;">
+            <button onclick="exportToExcel()">Export to Excel</button>
+            <h3>All Users Summary</h3>
+            <pre id="allData"></pre>
+        </div>
+    </div>
+
+    <script>
+        const users = {
+            "Dehemi": { id: 1001, password: "1000" },
+            "Suresh": { id: 1002, password: "1001" },
+            "Nithila": { id: 1003, password: "1002" },
+            "Ashvini": { id: 1004, password: "1003" },
+            "Rashika": { id: 1005, password: "1004" },
+            "Admin": { id: 7788, password: "7788" }
+        };
+
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",  // Replace with your API key
+            authDomain: "sales-inquiry-tracker.firebaseapp.com",
+            databaseURL: "https://sales-inquiry-tracker-default-rtdb.asia-southeast1.firebasedatabase.app/",
+            projectId: "sales-inquiry-tracker",
+            storageBucket: "sales-inquiry-tracker.appspot.com",
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID", // Replace with your messaging sender ID
+            appId: "YOUR_APP_ID"  // Replace with your app ID
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        let currentUser = null;
+        let currentUsername = null;
+
+        function login() {
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value.trim();
+
+            // Fix for login issue: Check if both username and password are correct
+            if (username && password && users[username] && users[username].password === password) {
+                currentUsername = username;
+                currentUser = users[username].id;
+                localStorage.setItem("userId", currentUser);
+                localStorage.setItem("username", currentUsername);
+                console.log(`Logged in as: ${currentUsername} (ID: ${currentUser})`);
+                showDashboard();
+            } else {
+                alert("Invalid username or password. Please try again.");
+            }
+        }
+
+        function showDashboard() {
+            document.getElementById('login-container').style.display = 'none';
+            document.getElementById('dashboard').style.display = 'block';
+            document.getElementById('entryDate').valueAsDate = new Date();
+            document.getElementById('welcome').innerText = `Welcome, ${currentUsername}`;
+
+            // Admin should only be able to view inquiries and export data
+            if (currentUsername === "Admin") {
+                document.getElementById('admin-panel').style.display = 'block';
+                document.getElementById('inquiry-form').style.display = 'none';
+                showAllInquiries();
+            } else {
+                document.getElementById('inquiry-form').style.display = 'block';
+                document.getElementById('admin-panel').style.display = 'none';
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem("userId");
+            localStorage.removeItem("username");
+            document.getElementById('login-container').style.display = 'block';
+            document.getElementById('dashboard').style.display = 'none';
+            console.log("Logged out");
+        }
+
+        function submitInquiry() {
+            const date = document.getElementById('entryDate').value;
+            const data = {
+                weddings: parseInt(document.getElementById('weddings').value || 0),
+                dayOuts: parseInt(document.getElementById('dayOuts').value || 0),
+                rooms: parseInt(document.getElementById('rooms').value || 0),
+                honeymoon: parseInt(document.getElementById('honeymoon').value || 0),
+                highTea: parseInt(document.getElementById('highTea').value || 0),
+                buffets: parseInt(document.getElementById('buffets').value || 0),
+                hotOrders: parseInt(document.getElementById('hotOrders').value || 0),
+                deliveryOrders: parseInt(document.getElementById('deliveryOrders').value || 0)
+            };
+            db.ref(`inquiries/${currentUser}/${date}`).set(data).then(() => {
+                alert("Inquiry submitted successfully!");
+                if (currentUsername === "Admin") showAllInquiries();
+            });
+        }
+
+        function showAllInquiries() {
+            db.ref('inquiries').once('value', snapshot => {
+                const all = snapshot.val();
+                let output = "";
+                for (let userId in all) {
+                    let name = Object.keys(users).find(key => users[key].id == userId);
+                    output += `\n${name} (${userId}):\n`;
+                    for (let date in all[userId]) {
+                        output += `  ${date}:\n`;
+                        const data = all[userId][date];
+                        for (let key in data) {
+                            output += `    ${key}: ${data[key]}\n`;
+                        }
+                    }
+                }
+                document.getElementById('allData').innerText = output;
+            });
+        }
+
+        function exportToExcel() {
+            db.ref('inquiries').once('value', snapshot => {
+                const all = snapshot.val();
+                const rows = [];
+                for (let userId in all) {
+                    let name = Object.keys(users).find(key => users[key].id == userId);
+                    for (let date in all[userId]) {
+                        const d = all[userId][date];
+                        rows.push({
+                            User: name,
+                            Date: date,
+                            Weddings: d.weddings,
+                            DayOuts: d.dayOuts,
+                            Rooms: d.rooms,
+                            Honeymoon: d.honeymoon,
+                            HighTea: d.highTea,
+                            Buffets: d.buffets,
+                            HotOrders: d.hotOrders,
+                            DeliveryOrders: d.deliveryOrders
+                        });
+                    }
+                }
+                const worksheet = XLSX.utils.json_to_sheet(rows);
+                const workbook = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(workbook, worksheet, "Inquiries");
+                XLSX.writeFile(workbook, "sales_inquiries.xlsx");
+            });
+        }
+
+        window.onload = () => {
+            const storedId = localStorage.getItem("userId");
+            const storedName = localStorage.getItem("username");
+            if (storedId && storedName && users[storedName]) {
+                currentUser = storedId;
+                currentUsername = storedName;
+                showDashboard();
+            }
+        }
+    </script>
+</body>
+</html>
